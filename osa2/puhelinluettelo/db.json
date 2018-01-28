@@ -1,0 +1,13 @@
+{
+	"persons": [
+		  {
+				"name": "Arto Hellas", "number": "05022356234"
+			},
+			{
+				"name": "Pekka Pasila", "number": "2203030300"
+			},
+			{
+				"name": "Matti Muilu", "number": "223-234452"
+			}
+	]
+}
