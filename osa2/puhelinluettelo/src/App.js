@@ -1,5 +1,5 @@
 import React from 'react';
-import axios from 'axios'
+import personService from './services/persons'
 
 class App extends React.Component {
   constructor(props) {
@@ -8,13 +8,13 @@ class App extends React.Component {
       persons: [],
       newName: '',
 			newNumber: '',
-			searchString: ''
+			searchString: '',
+			notificationMessage: null
     }
   }
 
 	componentWillMount() {
-		axios
-		.get('http://localhost:3001/persons')
+			personService.getAll()
 			.then(response => {
 				this.setState({persons: response.data})
 			})
@@ -38,20 +38,55 @@ class App extends React.Component {
 		const newName = this.state.newName
 		const newNumber = this.state.newNumber
 		
-		if (newName !== '' 
-	  && newNumber !== ''
-		&& !this.state.persons.some(person => person.name === newName)) {
+		if (newName !== '' && newNumber !== '') {
+			if (!this.state.persons.some(person => person.name === newName)) {		
+				const newPerson = {name: newName, number: newNumber}
+				
+				personService.create(newPerson)
+					.then(response => {
+						this.setState({
+							persons: this.state.persons.concat(response.data), 
+							newName: '',
+							newNumber: '',
+							notificationMessage: 'henkilö lisätty'
+						})
+					})
 					
-			this.setState({
-				persons: this.state.persons.concat(
-					{name: this.state.newName, number: this.state.newNumber}
-				)
-			})
+			} else if (window.confirm(`${newName} on jo luettelossa, korvataanko vanha numero uudella?`)) {
+				let person = this.state.persons.find(person => person.name === newName)
+				person = {...person, number: newNumber}
+				const id = person.id
+								
+				personService.update(id, person)
+					.then(response => {
+						const persons = this.state.persons.filter(person => person.id !== id)
+						this.setState({
+							persons: persons.concat(person),
+							newName: '',
+							newNumber: '',
+							notificationMessage: 'numero muutettu'
+						})
+					})
+					.catch(error => {
+						alert('person does not exist')
+						this.setState({
+							persons: this.state.persons.filter(person => person.id !== id)
+						})
+					})
+			}
+		} else {
+			alert('Kentät eivät saa olla tyhjiä')
 		}
-		this.setState({
-				newName: '',
-				newNumber: ''
-		})
+	}
+	
+	removePerson = (id) => {
+		personService.remove(id)
+			.then(response => {
+				this.setState({
+					persons: this.state.persons.filter(person => person.id !== id),
+					notificationMessage: 'henkilö poistettu'
+				})
+			})
 	}
 	
   render() {
@@ -64,6 +99,8 @@ class App extends React.Component {
       <div>
         <h2>Puhelinluettelo</h2>
 		
+				<Notification message={this.state.notificationMessage} />
+		
 				<Search state={this.state} changeHandler={this.handleSearchString} />
 			
 				<NewForm 
@@ -74,7 +111,7 @@ class App extends React.Component {
 				/>
 				
         
-        <Persons persons={personsToShow} />
+        <Persons persons={personsToShow} listener={this.removePerson} />
 		
       </div>
     )
@@ -94,21 +131,19 @@ const NewForm = ({state, addPersonHandler, nameChangeHandler, numberChangeHandle
 	<div>
 		<h2>Lisää uusi</h2>
     <form onSubmit={addPersonHandler}>
-      <div>
-        nimi: <input value={state.newName} onChange={nameChangeHandler} />
-				puhelinnumero: <input value={state.newNumber} onChange={numberChangeHandler}/>
-      </div>
-		  
-      <div>
-        <button type="submit">lisää</button>
-      </div>
+        nimi: <input value={state.newName} onChange={nameChangeHandler} /><br></br>
+				puhelinnumero: <input value={state.newNumber} onChange={numberChangeHandler}/><br></br>
+        <button type="submit">lisää</button>   
     </form>
 	</div>
 )
 
-const Persons = ({persons}) => {
+const Persons = ({persons, listener}) => {
 	const personsMapped = persons.map(person => 
-		<div key={person.name}>{person.name} ({person.number})</div>
+		<div key={person.name}>
+			{person.name} ({person.number})
+			<button onClick={listener.bind(this, person.id)}>poista</button>
+		</div>
 	)
 	return (
 		<div>
@@ -117,5 +152,16 @@ const Persons = ({persons}) => {
 		</div>
 	)
 }
+
+const Notification = ({ message }) => {
+  if (message === null) {
+    return null
+  }
+  return (
+    <div className="notification">
+      {message}
+    </div>
+  )
+} 
 
 export default App
